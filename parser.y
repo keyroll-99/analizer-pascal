@@ -19,18 +19,41 @@ int set_program_name(char name[100]){
 
 int add_uses(){
     uses_count++;
+    line_count++;
 }
 
 int add_var(){
     var_count++;
+    line_count++;
 }
 
 int add_function(){
     functions_count++;
+    line_count++;
 }
 
 int add_procedures(){
     procedures_count++;
+    line_count++;
+}
+
+int add_if(){
+    if_count++;
+    line_count++;
+}
+
+int add_while(){
+    while_count++;
+    line_count++;
+}
+
+int add_repeat(){
+    repeat_count++;
+    line_count++;
+}
+
+int add_line(){
+    line_count++;
 }
 
 %}
@@ -42,7 +65,7 @@ int add_procedures(){
 }
 
 %token PROGRAM_NAME STOP SEMICOLON USES VAR  COLON COMMA DOT COMMENT FUNCTION PROCEDURE IF THEN ELSE BEGIN_BLOCK END REPEAT UNTIL WHILE OPEN_BRACKETS CLOSE_BRACKETS
-%token REAL_TYPE STRING_TYPE INTEGER_TYPE BOOLEAN_TYPE PLUS MINUS ASTERISK SLASH ASSIGNMENT EQUALITY_OPERATOR RELATIONAL_OPERATOR OR AND
+%token REAL_TYPE STRING_TYPE INTEGER_TYPE BOOLEAN_TYPE PLUS MINUS ASTERISK SLASH ASSIGNMENT EQUALITY_OPERATOR RELATIONAL_OPERATOR OR AND DO CONTINUE BREAK APOSTROPHE STR
 
 %token <string> WORD;
 
@@ -50,7 +73,7 @@ int add_procedures(){
 
 program : 
     /* empty */
-    | program_heading SEMICOLON blocks stop_block
+    | program_heading SEMICOLON blocks
     ;
 
 types : 
@@ -64,7 +87,7 @@ program_heading:
     ;
 
 blocks:
-    uses_block variable_block function_or_procedure_block
+    uses_block variable_block function_or_procedure_block main_block
     ;
 
 uses_block:
@@ -91,19 +114,31 @@ function_var:
     | var_list
     ;
 
-var_list:
-    var_delcaration SEMICOLON var_list
-    | var_delcaration
+function_argument_list:
+    /* empty */
+    | function_argument_declaration SEMICOLON function_argument_list
+    | function_argument_declaration
+
+function_argument_declaration:
+    argument_name COLON types {add_line();}
+
+argument_name:
+    WORD COMMA var_name_list 
+    |WORD 
     ;
 
-var_delcaration:
-    var_name_list COLON types
-    | WORD COLON types EQUALITY_OPERATOR WORD SEMICOLON
+var_list:
+    var_declaration SEMICOLON var_list
+    | var_declaration SEMICOLON
+    ;
+
+var_declaration:
+    var_name_list COLON types {add_var();}
     ;
 
 var_name_list:
-    WORD COMMA var_name_list {add_var();}
-    | WORD {add_var();}
+    WORD COMMA var_name_list 
+    |WORD 
     ;
 
 function_or_procedure_block: 
@@ -116,40 +151,88 @@ function_or_procedure_declaration:
     | procedure_declaration {add_procedures();}
 
 function_declaration:
-    FUNCTION WORD OPEN_BRACKETS function_var CLOSE_BRACKETS COLON types SEMICOLON variable_block block
+    FUNCTION WORD OPEN_BRACKETS function_argument_list CLOSE_BRACKETS COLON types SEMICOLON function_var block
     ;
 
 procedure_declaration:
-    PROCEDURE WORD OPEN_BRACKETS function_var CLOSE_BRACKETS SEMICOLON variable_block block SEMICOLON
+    PROCEDURE WORD OPEN_BRACKETS function_argument_list CLOSE_BRACKETS SEMICOLON function_var block SEMICOLON
     ;
 
 block: 
     BEGIN_BLOCK code_block END
     ;
 
+
 code_block:
     /* empty */
     | state_list SEMICOLON code_block
-    | state_list 
+    | state_list
     ;
 
 state_list:
-    assignment_state
-    | procedure_call_state
-    | if_statement
+    assignment_state {add_line();}
+    | procedure_call_state {add_line();}
+    | if_statement {add_if();}
+    | while_statement {add_while();}
+    | repeat_statement {add_repeat();}
     ;
 
 assignment_state:
-    WORD ASSIGNMENT WORD
+    | WORD ASSIGNMENT WORD
+    | WORD ASSIGNMENT operation
+    | WORD ASSIGNMENT STR
     ;
+
+operation: 
+    WORD RELATIONAL_OPERATOR WORD
+    | WORD PLUS WORD
+    | WORD MINUS WORD
+    | WORD ASTERISK WORD
+    | WORD SLASH WORD
+    | WORD RELATIONAL_OPERATOR combinante_operation
+    | combinante_operation RELATIONAL_OPERATOR WORD
+    | combinante_operation RELATIONAL_OPERATOR combinante_operation
+    | WORD PLUS combinante_operation
+    | combinante_operation PLUS WORD
+    | combinante_operation PLUS combinante_operation
+    | WORD MINUS combinante_operation
+    | combinante_operation MINUS WORD
+    | combinante_operation MINUS combinante_operation
+    | WORD ASTERISK combinante_operation
+    | combinante_operation ASTERISK WORD
+    | combinante_operation ASTERISK combinante_operation
+    | WORD SLASH combinante_operation
+    | combinante_operation SLASH WORD
+    | combinante_operation SLASH combinante_operation
+    ;
+ 
+combinante_operation:
+    OPEN_BRACKETS operation CLOSE_BRACKETS
 
 procedure_call_state:
-    WORD OPEN_BRACKETS CLOSE_BRACKETS
+    WORD OPEN_BRACKETS procedure_argument CLOSE_BRACKETS
     ;
 
+procedure_argument:
+    /* empty */
+    | WORD COMMA procedure_argument
+    | STR COMMA procedure_argument
+    | expresion COMMA procedure_argument
+    | expresion
+    | STR
+    | WORD
+    
+
 if_statement: 
-    IF OPEN_BRACKETS expresion CLOSE_BRACKETS THEN code_block
-    | IF OPEN_BRACKETS expresion CLOSE_BRACKETS THEN code_block ELSE code_block
+    IF OPEN_BRACKETS expresion CLOSE_BRACKETS THEN code_block {add_line();}
+    | IF OPEN_BRACKETS expresion CLOSE_BRACKETS THEN code_block ELSE code_block {add_line();}
+    ;
+
+while_statement:
+    WHILE expresion DO BEGIN_BLOCK code_block END SEMICOLON
+
+repeat_statement:
+    REPEAT code_block UNTIL expresion SEMICOLON
     ;
 
 expresion:
@@ -159,14 +242,16 @@ expresion:
     ;
 
 simple_expresion:
-    WORD RELATIONAL_OPERATOR WORD
+    operation
     | WORD EQUALITY_OPERATOR WORD
     ;
 
 
-stop_block:
-    DOT {return 0;}
+
+main_block:
+    BEGIN_BLOCK code_block END DOT {add_line(); add_line(); return 0;}
     ;
+
 %% 
  
 main()
@@ -175,6 +260,12 @@ main()
  printf("\nprogram_name %s\n", program_name);
  printf("Uses count %d\n", uses_count);
  printf("Var count %d\n", var_count);
+ printf("If count %d\n", if_count);
+ printf("While count %d\n", while_count);
+ printf("Reapt count %d\n", repeat_count);
+ printf("Line count %d\n", line_count);
+ printf("Procedure count %d\n", procedures_count);
+ printf("Function count %d\n", functions_count);
 }
  
 int yyerror(char *s)
